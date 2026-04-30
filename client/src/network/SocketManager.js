@@ -21,12 +21,13 @@ export class SocketManager {
    * @param {string} [url] - Server URL. Defaults to auto-detect.
    */
   connect(url = undefined) {
-    // Connect directly to the game server, bypassing Vite's dev proxy.
-    // The proxy adds latency and irregular frame delivery to WebSocket traffic.
-    const serverUrl = url || `http://${window.location.hostname}:3001`;
+    // In production: client and server share the same origin (no port needed).
+    // In dev: Vite serves on 5173, game server on 3001.
+    const isDev = window.location.port === '5173';
+    const serverUrl = url || (isDev ? `http://${window.location.hostname}:3001` : undefined);
     this.socket = io(serverUrl, {
       reconnectionDelayMax: 10000,
-      transports: ['websocket'] // WebSocket only — no polling fallback
+      transports: ['websocket']
     });
 
     this.socket.on('connect', () => {
