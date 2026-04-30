@@ -47,36 +47,16 @@ export default class PlayerState {
     }
     if (this.state !== 'alive') return;
 
-    const speed = PLAYER.MOVE_SPEED;
-    let dx = 0;
-    let dz = 0;
-
-    // Support both input formats
-    if (input.movement) {
-      dx = input.movement.x || 0;
-      dz = input.movement.z || 0;
-    } else {
-      if (input.up) dz -= 1;
-      if (input.down) dz += 1;
-      if (input.left) dx -= 1;
-      if (input.right) dx += 1;
+    // Accept client-reported position (client is authoritative for movement
+    // since we use pure client-side prediction without reconciliation).
+    // Server validates bounds only.
+    if (input.pos) {
+      const pad = PLAYER.RADIUS;
+      this.x = Math.max(-HALF_W + pad, Math.min(HALF_W - pad, input.pos.x));
+      this.z = Math.max(-HALF_D + pad, Math.min(HALF_D - pad, input.pos.z));
     }
-
-    // Normalize diagonal movement
-    if (dx !== 0 || dz !== 0) {
-      const length = Math.sqrt(dx * dx + dz * dz);
-      dx /= length;
-      dz /= length;
-    }
-
-    this.vx = dx * speed;
-    this.vz = dz * speed;
-
-    this.x += this.vx * dt;
-    this.z += this.vz * dt;
 
     // Look rotation from aim direction
-    // aimPosition is a direction vector (camera forward * 100), not a world position
     if (input.aimPosition && input.aimPosition.x !== undefined) {
       this.rotation = Math.atan2(
         input.aimPosition.x,
@@ -84,25 +64,30 @@ export default class PlayerState {
       );
     }
 
-    // Clamp to arena bounds (with player radius padding)
-    const pad = PLAYER.RADIUS;
-    if (this.x < -HALF_W + pad) this.x = -HALF_W + pad;
-    if (this.x > HALF_W - pad) this.x = HALF_W - pad;
-    if (this.z < -HALF_D + pad) this.z = -HALF_D + pad;
-    if (this.z > HALF_D - pad) this.z = HALF_D - pad;
-
     // Handle dash
+    const speed = PLAYER.MOVE_SPEED;
+    let dx = 0;
+    let dz = 0;
+    if (input.movement) {
+      dx = input.movement.x || 0;
+      dz = input.movement.z || 0;
+    }
+    if (dx !== 0 || dz !== 0) {
+      const length = Math.sqrt(dx * dx + dz * dz);
+      dx /= length;
+      dz /= length;
+    }
+    this.vx = dx * speed;
+    this.vz = dz * speed;
+
     if (input.dash && Date.now() > this.dashCooldownEnd) {
       this.dashCooldownEnd = Date.now() + PLAYER.DASH_COOLDOWN;
-      // Instant dash movement in input direction
       if (dx !== 0 || dz !== 0) {
         this.x += dx * PLAYER.DASH_SPEED * 0.2;
         this.z += dz * PLAYER.DASH_SPEED * 0.2;
-        // Re-clamp
-        if (this.x < -HALF_W + pad) this.x = -HALF_W + pad;
-        if (this.x > HALF_W - pad) this.x = HALF_W - pad;
-        if (this.z < -HALF_D + pad) this.z = -HALF_D + pad;
-        if (this.z > HALF_D - pad) this.z = HALF_D - pad;
+        const pad = PLAYER.RADIUS;
+        this.x = Math.max(-HALF_W + pad, Math.min(HALF_W - pad, this.x));
+        this.z = Math.max(-HALF_D + pad, Math.min(HALF_D - pad, this.z));
       }
     }
   }

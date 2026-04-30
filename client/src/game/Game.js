@@ -143,6 +143,13 @@ export class Game {
       pkt.aimPosition.z = this.lastInput.aimPosition.z;
       pkt.firing = this.lastInput.firing;
       pkt.dash = this.lastInput.dash;
+
+      // Include client position so server can sync projectile origins
+      const lp = this.players.get(this.localPlayerId);
+      if (lp) {
+        pkt.pos = { x: lp.x, z: lp.z };
+      }
+
       this.socketManager.sendInput(pkt);
     }
 
