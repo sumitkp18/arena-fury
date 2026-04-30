@@ -1,0 +1,17 @@
+{
+  "name": "arena-fury-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/index.js",
+    "start": "node src/index.js",
+    "test": "echo \"No tests yet\""
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "socket.io": "^4.8.0",
+    "cors": "^2.8.5",
+    "uuid": "^11.1.0",
+    "arena-fury-shared": "file:../shared"
+  }
+}

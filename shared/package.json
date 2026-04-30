@@ -1,0 +1,7 @@
+{
+  "name": "arena-fury-shared",
+  "version": "1.0.0",
+  "description": "Shared constants, protocol, and utilities for Arena Fury",
+  "main": "index.js",
+  "type": "module"
+}

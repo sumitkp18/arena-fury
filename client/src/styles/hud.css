@@ -1,0 +1,185 @@
+#hud-overlay {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 20px;
+}
+
+.hud-hidden {
+  display: none !important;
+}
+
+/* Score / Top Center */
+.hud-score {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--color-primary);
+  text-shadow: var(--glow-primary);
+  background: rgba(10, 10, 26, 0.6);
+  padding: 10px 20px;
+  border: 1px solid rgba(0, 255, 204, 0.3);
+  border-radius: 4px;
+}
+
+/* Health Bar */
+.hud-health-container {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.hud-health-bg {
+  width: 100%;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 2px solid var(--color-surface);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+}
+
+.hud-health-fill {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #00b386, var(--color-primary));
+  box-shadow: var(--glow-primary);
+  transition: width 0.1s linear, background 0.3s;
+}
+
+.hud-health-fill.low {
+  background: linear-gradient(90deg, #b3003b, var(--color-secondary));
+  box-shadow: var(--glow-secondary);
+}
+
+/* Dash Cooldown */
+.hud-dash-bg {
+  width: 200px;
+  height: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 3px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.hud-dash-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--color-accent);
+  transition: width 0.1s linear;
+}
+
+/* Crosshair */
+.hud-crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+}
+
+.hud-crosshair::before,
+.hud-crosshair::after {
+  content: '';
+  position: absolute;
+  background: var(--color-primary);
+  box-shadow: 0 0 4px var(--color-primary);
+}
+
+.hud-crosshair::before {
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.hud-crosshair::after {
+  top: 0;
+  left: 50%;
+  width: 2px;
+  height: 100%;
+  transform: translateX(-50%);
+}
+
+/* Kill Feed */
+.hud-killfeed {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  width: 300px;
+}
+
+.killfeed-entry {
+  background: rgba(10, 10, 26, 0.7);
+  border-left: 3px solid var(--color-secondary);
+  padding: 6px 12px;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--color-text);
+  border-radius: 0 4px 4px 0;
+  animation: slide-in 0.3s ease-out;
+  opacity: 1;
+  transition: opacity 0.5s;
+}
+
+.killfeed-entry.fade-out {
+  opacity: 0;
+}
+
+.killfeed-killer { color: var(--color-primary); font-weight: 600; }
+.killfeed-victim { color: var(--color-secondary); font-weight: 600; }
+.killfeed-weapon { color: var(--color-text-dim); margin: 0 6px; }
+
+/* Stats (Ping, Players) */
+.hud-stats {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: var(--color-text-dim);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-value {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+@keyframes slide-in {
+  from { transform: translateX(20px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* Exit button */
+.hud-exit-btn {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  pointer-events: auto;
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+  opacity: 0.5;
+  transition: opacity 0.2s, box-shadow 0.2s;
+}
+
+.hud-exit-btn:hover {
+  opacity: 1;
+}
