@@ -27,6 +27,10 @@ body {
   color: var(--color-text);
   font-family: var(--font-body);
   user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none;
 }
 
 #game-canvas {

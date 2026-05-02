@@ -95,6 +95,9 @@ export class Game {
     };
 
     this.sceneManager.renderer.setAnimationLoop((time) => this.loop(time));
+
+    // Show mobile touch controls
+    this.inputManager.showTouchControls();
   }
 
   /**
@@ -349,6 +352,7 @@ export class Game {
     this.isRunning = false;
     this.sceneManager.renderer.setAnimationLoop(null);
 
+    this.inputManager.hideTouchControls();
     this.inputManager.dispose();
 
     for (const p of this.players.values()) {

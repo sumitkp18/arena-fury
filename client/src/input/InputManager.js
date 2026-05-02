@@ -1,12 +1,10 @@
 import * as THREE from 'three';
+import { TouchControls } from './TouchControls.js';
 
 /**
- * Handles keyboard + mouse input with pointer lock for camera control.
- * - WASD / Arrow keys: movement (relative to camera direction)
- * - Mouse movement: orbit camera (via pointer lock)
- * - Left click: fire
- * - Space / Shift / Right click: dash
- * - Scroll wheel: zoom
+ * Handles keyboard + mouse + touch input.
+ * - Desktop: WASD/arrows + pointer lock mouse + click to fire
+ * - Mobile:  Left joystick + right drag/tap for aim & shoot
  */
 export class InputManager {
   constructor(canvas, camera, cameraController) {
@@ -33,6 +31,13 @@ export class InputManager {
       dash: false
     };
 
+    // Mobile touch controls
+    this.isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    this.touchControls = new TouchControls(
+      canvas.parentElement || document.body,
+      cameraController
+    );
+
     // Bind handlers
     this.onKeyDown = this.onKeyDown.bind(this);
     this.onKeyUp = this.onKeyUp.bind(this);
@@ -57,8 +62,10 @@ export class InputManager {
     this.canvas.addEventListener('wheel', this.onWheel, { passive: true });
     document.addEventListener('pointerlockchange', this.onPointerLockChange);
 
-    // Click canvas to enter pointer lock
-    this.canvas.addEventListener('click', this.onCanvasClick);
+    // Click canvas to enter pointer lock (desktop only)
+    if (!this.isMobile) {
+      this.canvas.addEventListener('click', this.onCanvasClick);
+    }
   }
 
   dispose() {
@@ -75,10 +82,22 @@ export class InputManager {
     if (document.pointerLockElement === this.canvas) {
       document.exitPointerLock();
     }
+
+    if (this.touchControls) {
+      this.touchControls.dispose();
+    }
+  }
+
+  showTouchControls() {
+    if (this.touchControls) this.touchControls.show();
+  }
+
+  hideTouchControls() {
+    if (this.touchControls) this.touchControls.hide();
   }
 
   onCanvasClick() {
-    if (!this.isPointerLocked) {
+    if (!this.isPointerLocked && !this.isMobile) {
       this.canvas.requestPointerLock();
     }
   }
@@ -104,7 +123,6 @@ export class InputManager {
 
   onMouseMove(e) {
     if (this.isPointerLocked) {
-      // Pointer lock mode: use movementX/Y deltas for camera orbit
       const dx = e.movementX || 0;
       const dy = e.movementY || 0;
 
@@ -113,7 +131,6 @@ export class InputManager {
       }
     }
 
-    // Always track screen position for aim raycast
     const rect = this.canvas.getBoundingClientRect();
     this.mouseScreen.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
     this.mouseScreen.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
@@ -141,9 +158,6 @@ export class InputManager {
     }
   }
 
-  /**
-   * Raycast mouse screen position to the ground plane (y=0).
-   */
   updateMouseWorld() {
     if (!this.camera) return;
     this.raycaster.setFromCamera(this.mouseScreen, this.camera);
@@ -152,10 +166,16 @@ export class InputManager {
 
   /**
    * Returns the current input state.
-   * Movement is oriented relative to the camera's facing direction.
+   * Merges keyboard/mouse + touch inputs.
    */
-   update() {
-    // Raw WASD input
+  update() {
+    let moveX = 0;
+    let moveZ = 0;
+    let aimX = 0;
+    let aimZ = -1;
+    let isFiring = false;
+
+    // ─── Desktop input ─────────────────────────────
     let rawX = 0;
     let rawZ = 0;
     if (this.keys.has('KeyW') || this.keys.has('ArrowUp')) rawZ -= 1;
@@ -163,44 +183,65 @@ export class InputManager {
     if (this.keys.has('KeyA') || this.keys.has('ArrowLeft')) rawX -= 1;
     if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) rawX += 1;
 
-    // Transform movement to be relative to camera direction
-    let moveX = 0;
-    let moveZ = 0;
-    let aimX = 0;
-    let aimZ = -1; // Default forward
-
     if (this.cameraController) {
       const forward = this.cameraController.getForward();
       const right = this.cameraController.getRight();
 
       if (rawX !== 0 || rawZ !== 0) {
-        // Forward is -Z in raw, Right is +X in raw
         moveX = forward.x * (-rawZ) + right.x * rawX;
         moveZ = forward.z * (-rawZ) + right.z * rawX;
-
-        // Normalize
         const len = Math.sqrt(moveX * moveX + moveZ * moveZ);
-        if (len > 0) {
-          moveX /= len;
-          moveZ /= len;
-        }
+        if (len > 0) { moveX /= len; moveZ /= len; }
       }
 
-      // Aim = camera forward direction
       aimX = forward.x * 100;
       aimZ = forward.z * 100;
     }
 
-    // Mutate pre-allocated state (zero allocations)
+    isFiring = this.mouseButtons.has(0) && this.isPointerLocked;
+
+    // ─── Touch input (overrides if active) ──────────
+    if (this.isMobile && this.touchControls) {
+      const touch = this.touchControls.getMovement();
+
+      if (Math.abs(touch.x) > 0.01 || Math.abs(touch.z) > 0.01) {
+        // Transform joystick XY to camera-relative world XZ
+        if (this.cameraController) {
+          const forward = this.cameraController.getForward();
+          const right = this.cameraController.getRight();
+
+          // Joystick: x = left/right, z = up/down (screen space)
+          // Screen up = camera forward, screen right = camera right
+          moveX = forward.x * (-touch.z) + right.x * touch.x;
+          moveZ = forward.z * (-touch.z) + right.z * touch.x;
+
+          const len = Math.sqrt(moveX * moveX + moveZ * moveZ);
+          if (len > 0) { moveX /= len; moveZ /= len; }
+        }
+      }
+
+      // Touch firing
+      if (this.touchControls.isFiring()) {
+        isFiring = true;
+      }
+
+      // Aim is always camera forward on mobile
+      if (this.cameraController) {
+        const forward = this.cameraController.getForward();
+        aimX = forward.x * 100;
+        aimZ = forward.z * 100;
+      }
+    }
+
+    // Write to pre-allocated state
     const s = this._inputState;
     s.movement.x = moveX;
     s.movement.z = moveZ;
     s.aimPosition.x = aimX;
     s.aimPosition.z = aimZ;
-    s.firing = this.mouseButtons.has(0) && this.isPointerLocked;
+    s.firing = isFiring;
     s.dash = this.dashPressedThisFrame;
 
-    // Reset frame-specific triggers
     this.dashPressedThisFrame = false;
 
     return s;
