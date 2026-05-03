@@ -183,3 +183,61 @@
 .hud-exit-btn:hover {
   opacity: 1;
 }
+
+/* ─── Mobile Responsive HUD ──────────────────────────── */
+
+@media (max-width: 768px), (max-height: 500px) {
+  #hud-overlay {
+    padding: 10px;
+  }
+
+  .hud-score {
+    top: 8px;
+    font-size: 1rem;
+    padding: 5px 12px;
+  }
+
+  .hud-health-container {
+    bottom: 85px;
+    width: clamp(150px, 50vw, 300px);
+  }
+
+  .hud-health-bg {
+    height: 14px;
+  }
+
+  .hud-dash-bg {
+    width: clamp(80px, 30vw, 160px);
+    height: 4px;
+    margin-top: 6px;
+  }
+
+  .hud-crosshair {
+    width: 18px;
+    height: 18px;
+  }
+
+  .hud-killfeed {
+    top: 8px;
+    right: 8px;
+    width: clamp(160px, 40vw, 250px);
+  }
+
+  .killfeed-entry {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+
+  .hud-stats {
+    top: 8px;
+    left: 8px;
+    font-size: 0.8rem;
+  }
+
+  .hud-exit-btn {
+    bottom: 8px;
+    right: 8px;
+    font-size: 0.7rem;
+    padding: 0.3rem 0.6rem;
+  }
+}

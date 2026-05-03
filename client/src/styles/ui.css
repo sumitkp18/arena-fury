@@ -1,11 +1,15 @@
 .lobby-container {
   width: 100%;
   max-width: 600px;
+  max-height: 100vh;
+  max-height: 100dvh;
   padding: 2.5rem;
   display: flex;
   flex-direction: column;
   gap: 2rem;
   text-align: center;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .lobby-hidden {
@@ -365,4 +369,206 @@
 @keyframes hint-pulse {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
+}
+
+/* ─── Mobile Responsive ──────────────────────────────── */
+
+/* Small screens (phones) */
+@media (max-width: 768px) {
+  .lobby-container {
+    padding: 1.2rem;
+    gap: 1rem;
+    max-width: 100%;
+  }
+
+  .lobby-title {
+    font-size: 2rem;
+    letter-spacing: 3px;
+  }
+
+  .title-accent {
+    font-size: 2.4rem;
+    letter-spacing: 6px;
+  }
+
+  .lobby-subtitle {
+    font-size: 0.7rem;
+    letter-spacing: 3px;
+    margin-bottom: 0.5rem;
+  }
+
+  .neon-input {
+    font-size: 1rem;
+    padding: 0.6rem 0.8rem;
+  }
+
+  .lobby-actions {
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.5rem;
+  }
+
+  .room-section {
+    flex-direction: column;
+    gap: 0.6rem;
+    padding-top: 1rem;
+  }
+
+  .room-section input,
+  .room-section button {
+    flex: unset;
+    width: 100%;
+  }
+
+  .btn-neon {
+    font-size: 0.95rem;
+    padding: 0.7rem 1rem;
+  }
+
+  .btn-ready {
+    font-size: 1rem;
+    padding: 0.8rem;
+  }
+
+  .room-code {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.7rem;
+  }
+
+  .player-name {
+    font-size: 0.95rem;
+  }
+
+  .player-card {
+    padding: 0.6rem 0.8rem;
+  }
+
+  .player-list {
+    max-height: 150px;
+    margin-bottom: 1rem;
+  }
+
+  .countdown-text {
+    font-size: 1.5rem;
+    padding: 0.7rem;
+  }
+
+  .countdown-go {
+    font-size: 2rem;
+  }
+
+  .results-container {
+    padding: 1.5rem;
+    gap: 1rem;
+  }
+
+  .winner-title {
+    font-size: 2rem;
+    letter-spacing: 2px;
+  }
+
+  .winner-subtitle {
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+  }
+
+  .winner-crown {
+    font-size: 2.5rem;
+  }
+
+  .winner-stat-row {
+    width: 100%;
+    max-width: 250px;
+    font-size: 0.9rem;
+  }
+}
+
+/* Landscape phones — very short viewport, compact everything */
+@media (max-height: 500px) {
+  .lobby-container {
+    padding: 0.6rem 1rem;
+    gap: 0.5rem;
+  }
+
+  .lobby-title {
+    font-size: 1.4rem;
+    letter-spacing: 2px;
+  }
+
+  .title-accent {
+    font-size: 1.6rem;
+    letter-spacing: 4px;
+  }
+
+  .lobby-subtitle {
+    font-size: 0.6rem;
+    letter-spacing: 2px;
+    margin-bottom: 0.2rem;
+  }
+
+  .lobby-actions {
+    flex-direction: row;
+    gap: 0.5rem;
+    margin-top: 0.3rem;
+  }
+
+  .room-section {
+    flex-direction: row;
+    padding-top: 0.5rem;
+    gap: 0.5rem;
+  }
+
+  .neon-input {
+    font-size: 0.85rem;
+    padding: 0.4rem 0.6rem;
+  }
+
+  .btn-neon {
+    font-size: 0.8rem;
+    padding: 0.5rem 0.8rem;
+  }
+
+  .btn-ready {
+    font-size: 0.85rem;
+    padding: 0.5rem;
+  }
+
+  .input-group label {
+    font-size: 0.75rem;
+  }
+
+  .input-group {
+    gap: 0.2rem;
+  }
+
+  .player-list {
+    max-height: 80px;
+    margin-bottom: 0.5rem;
+  }
+
+  .player-card {
+    padding: 0.3rem 0.6rem;
+  }
+
+  .player-name {
+    font-size: 0.85rem;
+  }
+
+  .room-header {
+    margin-bottom: 0.3rem;
+  }
+
+  .room-bottom-actions {
+    margin-top: 0.3rem;
+  }
+
+  .countdown-text {
+    font-size: 1.2rem;
+    padding: 0.5rem;
+  }
+
+  .winner-crown { font-size: 2rem; margin-bottom: 0.2rem; }
+  .winner-title { font-size: 1.5rem; }
+  .winner-subtitle { font-size: 0.8rem; margin-bottom: 0.5rem; }
+  .winner-stats { margin-bottom: 0.5rem; }
 }

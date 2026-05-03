@@ -22,6 +22,7 @@
 body {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   background-color: var(--color-bg);
   color: var(--color-text);
@@ -31,6 +32,7 @@ body {
   touch-action: none;
   -webkit-touch-callout: none;
   overscroll-behavior: none;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
 #game-canvas {
