@@ -59,6 +59,9 @@ export const POWERUP = {
 export const GAME = {
   MIN_PLAYERS: 2,
   MAX_PLAYERS: 6,
+  LIVES: 3,                // lives per player per game
+  RESPAWN_DELAY: 2000,     // ms before respawn
+  INVULN_TIME: 3000,       // ms of invulnerability after respawn
   ROUNDS_TO_WIN: 3,        // best of 5
   ROUND_TIME_LIMIT: 120000,// ms per round
   COUNTDOWN_TIME: 5000,    // ms before round starts

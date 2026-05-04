@@ -294,6 +294,7 @@
 
 .winner-banner-overlay.banner-visible {
   background: rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
 }
 
 .winner-banner-content {
@@ -358,12 +359,18 @@
   color: var(--color-text);
 }
 
-.winner-hint {
-  font-family: var(--font-display);
-  font-size: 0.75rem;
-  color: var(--color-text-dim);
-  letter-spacing: 2px;
-  animation: hint-pulse 2s ease-in-out infinite;
+.winner-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  margin-top: 0.5rem;
+  pointer-events: auto;
+}
+
+.winner-actions .btn-neon {
+  min-width: 140px;
+  font-size: 1rem;
+  padding: 0.7rem 1.2rem;
 }
 
 @keyframes hint-pulse {

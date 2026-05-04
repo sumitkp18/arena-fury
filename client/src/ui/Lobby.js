@@ -58,23 +58,31 @@ export class Lobby {
 
       <div id="toast-container" class="toast"></div>
 
-      <!-- Winner Banner (shown over gameplay) -->
-      <div class="winner-banner-overlay" id="winner-banner" style="display: none;">
-        <div class="winner-banner-content">
-          <div class="winner-crown">👑</div>
-          <h1 class="winner-title" id="winner-title">VICTORY</h1>
-          <p class="winner-subtitle" id="winner-subtitle">Round Over</p>
-          <div class="winner-stats" id="winner-stats"></div>
-          <p class="winner-hint">Next round starting soon...</p>
-        </div>
-      </div>
-
       <div class="glass-panel results-container lobby-hidden" id="results-screen">
         <h1 class="results-title" id="results-title">GAME OVER</h1>
         <div id="results-stats"></div>
         <button class="btn-neon" id="btn-backtolobby" style="margin-top: 1.5rem;">Back to Lobby</button>
       </div>
     `;
+
+    // Create the winner banner outside the lobby container so it's visible during gameplay
+    this._bannerEl = document.createElement('div');
+    this._bannerEl.className = 'winner-banner-overlay';
+    this._bannerEl.id = 'winner-banner';
+    this._bannerEl.style.display = 'none';
+    this._bannerEl.innerHTML = `
+      <div class="winner-banner-content">
+        <div class="winner-crown">👑</div>
+        <h1 class="winner-title" id="winner-title">VICTORY</h1>
+        <p class="winner-subtitle" id="winner-subtitle">Game Over</p>
+        <div class="winner-stats" id="winner-stats"></div>
+        <div class="winner-actions" id="winner-actions">
+          <button class="btn-neon" id="btn-play-again">⚡ PLAY AGAIN</button>
+          <button class="btn-neon secondary" id="btn-exit-game">✕ EXIT</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(this._bannerEl);
 
     this.bindEvents();
   }
@@ -213,10 +221,12 @@ export class Lobby {
   }
 
   /**
-   * Show the winner banner overlay with smooth animations.
-   * Called when a round ends, shown over the 3D scene.
+   * Show the game over banner with winner info + Play Again / Exit buttons.
+   * The banner stays visible until the player clicks a button.
+   * @param {object} data - { winner, players }
+   * @param {object} callbacks - { onPlayAgain, onExit }
    */
-  showWinnerBanner(data) {
+  showGameOverBanner(data, callbacks) {
     const banner = document.getElementById('winner-banner');
     const title = document.getElementById('winner-title');
     const subtitle = document.getElementById('winner-subtitle');
@@ -230,7 +240,7 @@ export class Lobby {
       title.style.color = data.winner.color || 'var(--color-warning)';
       subtitle.textContent = `${data.winner.kills || 0} Kills`;
     } else {
-      title.textContent = 'ROUND OVER';
+      title.textContent = 'GAME OVER';
       title.style.color = 'var(--color-warning)';
       subtitle.textContent = 'No winner';
     }
@@ -247,20 +257,40 @@ export class Lobby {
     });
     stats.innerHTML = html;
 
-    // Show with animation
+    // Wire up buttons
+    const playAgainBtn = document.getElementById('btn-play-again');
+    const exitBtn = document.getElementById('btn-exit-game');
+
+    // Clean up old listeners by replacing elements
+    if (playAgainBtn) {
+      const newPlayBtn = playAgainBtn.cloneNode(true);
+      playAgainBtn.parentNode.replaceChild(newPlayBtn, playAgainBtn);
+      if (callbacks?.onPlayAgain) {
+        newPlayBtn.addEventListener('click', callbacks.onPlayAgain);
+      }
+    }
+    if (exitBtn) {
+      const newExitBtn = exitBtn.cloneNode(true);
+      exitBtn.parentNode.replaceChild(newExitBtn, exitBtn);
+      if (callbacks?.onExit) {
+        newExitBtn.addEventListener('click', callbacks.onExit);
+      }
+    }
+
+    // Show with animation — stays until user clicks a button
     banner.style.display = 'flex';
     requestAnimationFrame(() => {
       banner.classList.add('banner-visible');
     });
 
-    // Auto-hide after 4.5 seconds
     if (this._bannerTimeout) clearTimeout(this._bannerTimeout);
-    this._bannerTimeout = setTimeout(() => {
-      banner.classList.remove('banner-visible');
-      setTimeout(() => {
-        banner.style.display = 'none';
-      }, 600);
-    }, 4500);
+  }
+
+  /**
+   * Legacy alias — calls showGameOverBanner without callbacks.
+   */
+  showWinnerBanner(data) {
+    this.showGameOverBanner(data, null);
   }
 
   /**
@@ -356,5 +386,8 @@ export class Lobby {
   dispose() {
     this.container.innerHTML = '';
     if (this._bannerTimeout) clearTimeout(this._bannerTimeout);
+    if (this._bannerEl && this._bannerEl.parentNode) {
+      this._bannerEl.parentNode.removeChild(this._bannerEl);
+    }
   }
 }

@@ -112,10 +112,17 @@ class App {
       }
     });
 
-    // Game starts — transition to gameplay
+    // Game starts — transition to gameplay (also handles restart after game over)
     this.socketManager.on(SERVER_EVENTS.GAME_START, (initialSnapshot) => {
       console.log('[App] Game starting!');
       this.lobby.hideWinnerBanner();
+
+      // If already playing (restart), dispose old game first
+      if (this.game) {
+        this.game.dispose();
+        this.game = null;
+      }
+
       this.startGame(initialSnapshot);
     });
 
@@ -126,24 +133,41 @@ class App {
       }
     });
 
-    // Player killed — add to kill feed
+    // Player killed — add to kill feed + show remaining lives
     this.socketManager.on(SERVER_EVENTS.PLAYER_KILLED, (data) => {
       if (this.hud) {
-        this.hud.addKillFeedEntry(data.killerName, data.victimName);
+        const livesText = data.victimLives > 0 ? ` (${data.victimLives} lives left)` : ' (eliminated!)';
+        this.hud.addKillFeedEntry(data.killerName, data.victimName + livesText);
       }
     });
 
-    // Round over — show winner banner with smooth transition
-    this.socketManager.on(SERVER_EVENTS.ROUND_OVER, (data) => {
-      console.log('[App] Round over:', data);
-      if (this.lobby && this.state === 'playing') {
-        this.lobby.showWinnerBanner(data);
+    // Player respawn — teleport and start invulnerability glow
+    this.socketManager.on(SERVER_EVENTS.PLAYER_RESPAWN, (data) => {
+      if (this.game) {
+        const p = this.game.players.get(data.playerId);
+        if (p) {
+          p.respawn(data.x, data.z, data.invulnDuration || 3000);
+        }
       }
     });
 
-    // Game over — return to lobby
+    // Game over — show winner banner with Play Again / Exit options
     this.socketManager.on(SERVER_EVENTS.GAME_OVER, (results) => {
-      this.endGame(results);
+      console.log('[App] Game over:', results);
+      // Keep the 3D scene running — show banner over it
+      if (this.lobby) {
+        this.lobby.showGameOverBanner(results, {
+          onPlayAgain: () => {
+            this.lobby.hideWinnerBanner();
+            // Tell server we want to play again
+            this.socketManager.emit(CLIENT_EVENTS.READY_TOGGLE, { ready: true });
+          },
+          onExit: () => {
+            this.lobby.hideWinnerBanner();
+            this.exitGame();
+          }
+        });
+      }
     });
 
     // Error from server

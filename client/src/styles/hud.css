@@ -9,12 +9,11 @@
   display: none !important;
 }
 
-/* Score / Top Center */
+/* Score / Top Right */
 .hud-score {
   position: absolute;
   top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  right: 20px;
   font-family: var(--font-display);
   font-size: 1.5rem;
   color: var(--color-primary);
@@ -23,6 +22,31 @@
   padding: 10px 20px;
   border: 1px solid rgba(0, 255, 204, 0.3);
   border-radius: 4px;
+}
+
+/* Lives */
+.hud-lives {
+  position: absolute;
+  top: 68px;
+  right: 20px;
+  display: flex;
+  gap: 6px;
+  font-size: 1.4rem;
+}
+
+.hud-life {
+  transition: all 0.3s ease;
+}
+
+.hud-life-active {
+  color: var(--color-primary);
+  text-shadow: 0 0 8px rgba(0, 255, 204, 0.6);
+  filter: drop-shadow(0 0 4px rgba(0, 255, 204, 0.4));
+}
+
+.hud-life-lost {
+  color: rgba(106, 106, 154, 0.3);
+  text-shadow: none;
 }
 
 /* Health Bar */
@@ -115,7 +139,7 @@
 /* Kill Feed */
 .hud-killfeed {
   position: absolute;
-  top: 20px;
+  top: 100px;
   right: 20px;
   display: flex;
   flex-direction: column;

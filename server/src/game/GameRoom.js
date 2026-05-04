@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import { SERVER_EVENTS, PROJECTILE, ARENA } from 'arena-fury-shared';
+import { SERVER_EVENTS, PROJECTILE, ARENA, GAME } from 'arena-fury-shared';
 import PlayerState from './PlayerState.js';
 import { getRandomSpawnPoint } from './GameConfig.js';
 
@@ -8,33 +8,32 @@ const HALF_D = ARENA.DEPTH / 2;
 
 /**
  * Manages a single game room (match).
- * Handles player state, projectiles, input processing, and win conditions.
+ * Lives system: each player has GAME.LIVES lives.
+ * On death: respawn with invulnerability if lives remain.
+ * When only one player has lives, that player wins → game over.
  */
 export default class GameRoom {
   constructor(id, io) {
     this.id = id;
     this.io = io;
     this.players = new Map();       // socketId -> PlayerState
-    this.state = 'lobby';           // lobby | countdown | playing | round_over | game_over
+    this.state = 'lobby';           // lobby | countdown | playing | game_over
     this.roundNumber = 0;
     this.scores = {};
     this.powerUps = new Map();
     this.projectiles = new Map();
     this.inputQueues = new Map();   // socketId -> input[]
+    this._pendingRespawns = [];     // { playerId, respawnAt }
   }
 
-  /**
-   * Add a player to this room.
-   */
   addPlayer(socketId, username, color) {
-    const id = socketId; // Use socketId as player ID for simpler client mapping
+    const id = socketId;
     const player = new PlayerState(id, socketId, username, color);
     this.players.set(socketId, player);
     this.inputQueues.set(socketId, []);
     this.scores[id] = 0;
     console.log(`[Room:${this.id.slice(0,8)}] Player "${username}" joined (${this.players.size} total)`);
 
-    // Notify others in room
     this.broadcast(SERVER_EVENTS.PLAYER_JOINED, {
       id: player.id,
       username: player.username,
@@ -44,9 +43,6 @@ export default class GameRoom {
     return player;
   }
 
-  /**
-   * Remove a player from this room.
-   */
   removePlayer(socketId) {
     const player = this.players.get(socketId);
     if (player) {
@@ -54,40 +50,36 @@ export default class GameRoom {
       this.inputQueues.delete(socketId);
       delete this.scores[player.id];
       console.log(`[Room:${this.id.slice(0,8)}] Player "${player.username}" left (${this.players.size} remaining)`);
-
-      // Notify others
       this.broadcast(SERVER_EVENTS.PLAYER_LEFT, { id: player.id });
+
+      // Remove pending respawns for this player
+      this._pendingRespawns = this._pendingRespawns.filter(r => r.playerId !== player.id);
     }
   }
 
-  /**
-   * Queue a player input for processing on next tick.
-   */
   handleInput(socketId, input) {
-    // Accept inputs in both lobby (for movement preview) and playing states
     const queue = this.inputQueues.get(socketId);
     if (queue) {
       queue.push(input);
     }
   }
 
-  /**
-   * Start the game with a countdown.
-   */
   startGame() {
     if (this.state === 'playing' || this.state === 'countdown') return;
 
     this.state = 'countdown';
     this.roundNumber++;
-    console.log(`[Room:${this.id.slice(0,8)}] Starting countdown for round ${this.roundNumber}`);
+    this._pendingRespawns = [];
+    console.log(`[Room:${this.id.slice(0,8)}] Starting countdown for game ${this.roundNumber}`);
 
-    // Assign spawn positions
+    // Reset all players for new game
     for (const player of this.players.values()) {
-      const spawn = getRandomSpawnPoint();
-      player.respawn(spawn.x, spawn.z);
+      player.resetForNewGame();
     }
 
-    // Countdown
+    // Clear projectiles
+    this.projectiles.clear();
+
     let count = 3;
     this.broadcast(SERVER_EVENTS.GAME_COUNTDOWN, { count });
 
@@ -96,9 +88,7 @@ export default class GameRoom {
       if (count <= 0) {
         clearInterval(interval);
         this.state = 'playing';
-        console.log(`[Room:${this.id.slice(0,8)}] Round ${this.roundNumber} started!`);
-
-        // Build initial snapshot with all players
+        console.log(`[Room:${this.id.slice(0,8)}] Game ${this.roundNumber} started!`);
         const snapshot = this.buildSnapshot();
         this.broadcast(SERVER_EVENTS.GAME_START, snapshot);
       } else {
@@ -121,71 +111,101 @@ export default class GameRoom {
             this.processFireInput(player, input);
           }
         }
-        queue.length = 0; // Clear processed inputs
+        queue.length = 0;
       }
     }
 
-    // Update all players (regen, powerup expiry, etc.)
+    // Update all players
     for (const player of this.players.values()) {
       player.update(dt);
     }
 
-    // Update projectiles (only during gameplay)
     if (this.state === 'playing') {
       this.updateProjectiles(dt);
-
-      // Check win condition
-      if (this.players.size > 1) {
-        const aliveCount = this.getAliveCount();
-        if (aliveCount <= 1) {
-          this.state = 'round_over';
-          console.log(`[Room:${this.id.slice(0,8)}] Round over!`);
-
-          // Find the winner (last player alive)
-          let winner = null;
-          const playerList = [];
-          for (const player of this.players.values()) {
-            playerList.push({
-              id: player.id,
-              username: player.username,
-              color: player.color,
-              kills: player.kills,
-              deaths: player.deaths,
-              score: player.score,
-              state: player.state
-            });
-            if (player.state === 'alive') {
-              winner = {
-                id: player.id,
-                username: player.username,
-                color: player.color,
-                kills: player.kills
-              };
-            }
-          }
-
-          this.broadcast(SERVER_EVENTS.ROUND_OVER, {
-            winner,
-            players: playerList,
-            round: this.roundNumber
-          });
-
-          // Auto-restart after delay
-          setTimeout(() => {
-            if (this.players.size >= 2) {
-              this.startGame();
-            } else {
-              this.state = 'lobby';
-            }
-          }, 5000);
-        }
-      }
+      this._processRespawns();
+      this._checkGameOver();
     }
   }
 
   /**
-   * Process fire input from a player.
+   * Process pending respawns.
    */
+  _processRespawns() {
+    const now = Date.now();
+    const remaining = [];
+
+    for (const entry of this._pendingRespawns) {
+      if (now >= entry.respawnAt) {
+        const player = this.findPlayerById(entry.playerId);
+        if (player && player.lives > 0) {
+          const spawn = getRandomSpawnPoint();
+          player.respawn(spawn.x, spawn.z);
+          console.log(`[Room:${this.id.slice(0,8)}] "${player.username}" respawned (${player.lives} lives left)`);
+
+          this.broadcast(SERVER_EVENTS.PLAYER_RESPAWN, {
+            playerId: player.id,
+            x: spawn.x,
+            z: spawn.z,
+            lives: player.lives,
+            invulnDuration: GAME.INVULN_TIME
+          });
+        }
+      } else {
+        remaining.push(entry);
+      }
+    }
+    this._pendingRespawns = remaining;
+  }
+
+  /**
+   * Check if only one player has lives remaining → game over.
+   */
+  _checkGameOver() {
+    if (this.players.size < 2) return;
+
+    // Count players with lives > 0
+    let playersWithLives = 0;
+    let lastAlive = null;
+    for (const player of this.players.values()) {
+      if (player.lives > 0) {
+        playersWithLives++;
+        lastAlive = player;
+      }
+    }
+
+    if (playersWithLives <= 1 && lastAlive) {
+      this.state = 'game_over';
+      console.log(`[Room:${this.id.slice(0,8)}] Game over! Winner: ${lastAlive.username}`);
+
+      const playerList = [];
+      for (const player of this.players.values()) {
+        playerList.push({
+          id: player.id,
+          username: player.username,
+          color: player.color,
+          kills: player.kills,
+          deaths: player.deaths,
+          score: player.score,
+          lives: player.lives,
+          state: player.state
+        });
+      }
+
+      this.broadcast(SERVER_EVENTS.GAME_OVER, {
+        winner: {
+          id: lastAlive.id,
+          username: lastAlive.username,
+          color: lastAlive.color,
+          kills: lastAlive.kills
+        },
+        players: playerList
+      });
+
+      // Clear projectiles
+      this.projectiles.clear();
+    }
+  }
+
   processFireInput(player, input) {
     if (input.firing && player.state === 'alive') {
       const now = Date.now();
@@ -194,14 +214,13 @@ export default class GameRoom {
         const id = uuidv4().slice(0, 8);
         const speed = PROJECTILE.SPEED;
 
-        // Fire in aim direction
         const dirX = Math.sin(player.rotation);
         const dirZ = Math.cos(player.rotation);
 
         this.projectiles.set(id, {
           id,
           ownerId: player.id,
-          x: player.x + dirX * 1.5,  // Offset from player center
+          x: player.x + dirX * 1.5,
           z: player.z + dirZ * 1.5,
           vx: dirX * speed,
           vz: dirZ * speed,
@@ -212,50 +231,44 @@ export default class GameRoom {
     }
   }
 
-  /**
-   * Update all projectiles: move, check lifetime, check collisions.
-   */
   updateProjectiles(dt) {
     const now = Date.now();
 
     for (const [id, proj] of this.projectiles.entries()) {
-      // Remove expired
       if (now - proj.createdAt > PROJECTILE.MAX_LIFETIME) {
         this.projectiles.delete(id);
         continue;
       }
 
-      // Move
       proj.x += proj.vx * dt;
       proj.z += proj.vz * dt;
 
-      // Remove if out of bounds
       if (Math.abs(proj.x) > HALF_W + 5 || Math.abs(proj.z) > HALF_D + 5) {
         this.projectiles.delete(id);
         continue;
       }
 
-      // Collision with players
       for (const player of this.players.values()) {
         if (player.id !== proj.ownerId && player.state === 'alive') {
           const dx = player.x - proj.x;
           const dz = player.z - proj.z;
           const dist = Math.sqrt(dx * dx + dz * dz);
-          const hitRadius = 1.2; // Player radius + projectile radius
+          const hitRadius = 1.2;
 
           if (dist < hitRadius) {
             const died = player.takeDamage(proj.damage);
             this.projectiles.delete(id);
 
-            // Notify hit
-            this.broadcast(SERVER_EVENTS.PLAYER_HIT, {
-              playerId: player.id,
-              damage: proj.damage,
-              health: player.health
-            });
+            if (!died) {
+              // Just a hit, not a kill
+              this.broadcast(SERVER_EVENTS.PLAYER_HIT, {
+                playerId: player.id,
+                damage: proj.damage,
+                health: player.health
+              });
+            }
 
             if (died) {
-              // Credit the kill to the projectile owner
               const killer = this.findPlayerById(proj.ownerId);
               if (killer) {
                 killer.kills++;
@@ -266,8 +279,17 @@ export default class GameRoom {
                 killerId: proj.ownerId,
                 killerName: killer ? killer.username : 'Unknown',
                 victimId: player.id,
-                victimName: player.username
+                victimName: player.username,
+                victimLives: player.lives
               });
+
+              // Queue respawn if lives remain
+              if (player.lives > 0) {
+                this._pendingRespawns.push({
+                  playerId: player.id,
+                  respawnAt: Date.now() + GAME.RESPAWN_DELAY
+                });
+              }
             }
             break;
           }
@@ -276,9 +298,6 @@ export default class GameRoom {
     }
   }
 
-  /**
-   * Find a player by their entity ID.
-   */
   findPlayerById(id) {
     for (const player of this.players.values()) {
       if (player.id === id) return player;
@@ -286,9 +305,6 @@ export default class GameRoom {
     return null;
   }
 
-  /**
-   * Build a complete game state snapshot for network transmission.
-   */
   buildSnapshot() {
     const playersObj = {};
     for (const player of this.players.values()) {
@@ -315,9 +331,6 @@ export default class GameRoom {
     };
   }
 
-  /**
-   * Count alive players.
-   */
   getAliveCount() {
     let count = 0;
     for (const player of this.players.values()) {
@@ -326,9 +339,6 @@ export default class GameRoom {
     return count;
   }
 
-  /**
-   * Broadcast an event to all sockets in this room.
-   */
   broadcast(event, data) {
     this.io.to(this.id).emit(event, data);
   }

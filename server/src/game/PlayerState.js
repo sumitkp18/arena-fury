@@ -1,11 +1,11 @@
-import { PLAYER, ARENA } from 'arena-fury-shared';
+import { PLAYER, ARENA, GAME } from 'arena-fury-shared';
 import { getRandomSpawnPoint } from './GameConfig.js';
 
 const HALF_W = ARENA.WIDTH / 2;
 const HALF_D = ARENA.DEPTH / 2;
 
 /**
- * Server-side player entity. Tracks position, health, and game state.
+ * Server-side player entity. Tracks position, health, lives, and game state.
  */
 export default class PlayerState {
   constructor(id, socketId, username, color) {
@@ -23,6 +23,7 @@ export default class PlayerState {
 
     this.maxHealth = PLAYER.MAX_HEALTH;
     this.health = this.maxHealth;
+    this.lives = GAME.LIVES;
     this.state = 'alive';
 
     this.kills = 0;
@@ -34,12 +35,14 @@ export default class PlayerState {
     this.lastDamageTime = 0;
     this.lastFireTime = 0;
 
+    // Invulnerability after respawn
+    this.invulnerableUntil = 0;
+
     this.activePowerUps = new Map();
   }
 
   /**
    * Apply a client input to this player.
-   * Input format: { seq, movement: {x, z}, aimPosition: {x, z}, firing, dash }
    */
   applyInput(input, dt) {
     if (input.seq !== undefined) {
@@ -47,9 +50,7 @@ export default class PlayerState {
     }
     if (this.state !== 'alive') return;
 
-    // Accept client-reported position (client is authoritative for movement
-    // since we use pure client-side prediction without reconciliation).
-    // Server validates bounds only.
+    // Accept client-reported position
     if (input.pos) {
       const pad = PLAYER.RADIUS;
       this.x = Math.max(-HALF_W + pad, Math.min(HALF_W - pad, input.pos.x));
@@ -92,16 +93,22 @@ export default class PlayerState {
     }
   }
 
+  isInvulnerable() {
+    return Date.now() < this.invulnerableUntil;
+  }
+
   takeDamage(amount) {
     if (this.state !== 'alive') return false;
+    if (this.isInvulnerable()) return false;
 
     this.health -= amount;
     this.lastDamageTime = Date.now();
 
     if (this.health <= 0) {
       this.health = 0;
-      this.state = 'dead';
+      this.lives--;
       this.deaths++;
+      this.state = 'dead';
       return true; // Player died
     }
     return false;
@@ -119,6 +126,25 @@ export default class PlayerState {
     this.z = z;
     this.vx = 0;
     this.vz = 0;
+    this.invulnerableUntil = Date.now() + GAME.INVULN_TIME;
+  }
+
+  /**
+   * Reset for a new game (fresh lives, score, etc.)
+   */
+  resetForNewGame() {
+    this.lives = GAME.LIVES;
+    this.kills = 0;
+    this.deaths = 0;
+    this.score = 0;
+    this.health = this.maxHealth;
+    this.state = 'alive';
+    this.invulnerableUntil = 0;
+    const spawn = getRandomSpawnPoint();
+    this.x = spawn.x;
+    this.z = spawn.z;
+    this.vx = 0;
+    this.vz = 0;
   }
 
   toSnapshot() {
@@ -131,7 +157,9 @@ export default class PlayerState {
       vz: Math.round(this.vz * 100) / 100,
       rotation: Math.round(this.rotation * 100) / 100,
       health: this.health,
+      lives: this.lives,
       state: this.state,
+      invulnerable: this.isInvulnerable(),
       lastProcessedInput: this.lastProcessedInput,
       color: this.color,
       username: this.username,

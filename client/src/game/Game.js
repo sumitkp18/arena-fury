@@ -163,13 +163,7 @@ export class Game {
   }
 
   _updateFpsDisplay(lastDt) {
-    if (!this._fpsEl) {
-      this._fpsEl = document.createElement('div');
-      this._fpsEl.style.cssText = 'position:fixed;top:8px;right:8px;color:#0f0;font:bold 14px monospace;background:rgba(0,0,0,0.7);padding:4px 8px;border-radius:4px;z-index:9999;pointer-events:none;';
-      document.body.appendChild(this._fpsEl);
-    }
-    const dtColor = lastDt > 20 ? '#f44' : '#0f0';
-    this._fpsEl.innerHTML = `FPS: ${this._fps} | dt: <span style="color:${dtColor}">${lastDt.toFixed(1)}ms</span>`;
+    // Debug FPS removed — was overlapping kill count HUD
   }
 
   /**
@@ -257,17 +251,34 @@ export class Game {
         this.addPlayer(pData);
       } else {
         const p = this.players.get(id);
+
+        // Handle death transition
+        if (pData.state === 'dead' && !p.isDead) {
+          p.die();
+          this.particles.spawnExplosion(p.x, p.z, p.colorHex, 25);
+        }
+
+        // Sync lives
+        p.lives = pData.lives;
+
+        // Sync invulnerability from server
+        if (pData.invulnerable && !p.invulnerable) {
+          p.invulnerable = true;
+          p.invulnEndTime = performance.now() + 3000;
+        }
+
         if (id === this.localPlayerId) {
-          // Local player is purely client-predicted — NEVER touch position.
-          // Only sync health/damage state from server.
-          if (pData.health < p.lastHealth) {
+          // Local player: only sync health/damage, never position
+          if (pData.health < p.lastHealth && pData.state === 'alive') {
             p.takeDamage();
           }
           p.lastHealth = pData.health;
         } else {
-          // Remote players: smooth interpolation toward server position
-          p.setTarget(pData.x, pData.z, pData.rotation);
-          if (pData.health < p.lastHealth) {
+          // Remote players
+          if (pData.state === 'alive') {
+            p.setTarget(pData.x, pData.z, pData.rotation);
+          }
+          if (pData.health < p.lastHealth && pData.state === 'alive') {
             p.takeDamage();
           }
           p.lastHealth = pData.health;
@@ -303,7 +314,7 @@ export class Game {
       }
     }
 
-    // Throttle HUD DOM updates to reduce layout thrashing
+    // Throttle HUD DOM updates
     if (currentTime - this._lastHudUpdate > this._hudUpdateInterval) {
       this._lastHudUpdate = currentTime;
       const lp = snapshot.players[this.localPlayerId];
@@ -312,7 +323,7 @@ export class Game {
         let alivePlayers = 0;
         for (const id in snapshot.players) {
           totalPlayers++;
-          if (snapshot.players[id].state === 'alive') alivePlayers++;
+          if (snapshot.players[id].lives > 0) alivePlayers++;
         }
         this.hud.update(
           { alivePlayers, totalPlayers },

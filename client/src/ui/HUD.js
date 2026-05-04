@@ -2,6 +2,7 @@ export class HUD {
   constructor(container) {
     this.container = container;
     this.elements = {};
+    this._lastLives = -1;
     this.createDOM();
   }
 
@@ -15,6 +16,8 @@ export class HUD {
       <div class="hud-score" id="hud-score">
         Kills: 0
       </div>
+
+      <div class="hud-lives" id="hud-lives"></div>
 
       <div class="hud-killfeed" id="hud-killfeed"></div>
 
@@ -36,6 +39,7 @@ export class HUD {
       ping: document.getElementById('hud-ping'),
       players: document.getElementById('hud-players'),
       score: document.getElementById('hud-score'),
+      lives: document.getElementById('hud-lives'),
       killfeed: document.getElementById('hud-killfeed'),
       healthFill: document.getElementById('hud-health-fill'),
       dashFill: document.getElementById('hud-dash-fill'),
@@ -72,6 +76,28 @@ export class HUD {
     this.elements.ping.textContent = `${latency}ms`;
     this.elements.players.textContent = `${gameState.alivePlayers || 0}/${gameState.totalPlayers || 0}`;
     this.elements.score.textContent = `Kills: ${localPlayerState.kills || 0}`;
+
+    // Lives — only re-render when value changes
+    const lives = localPlayerState.lives !== undefined ? localPlayerState.lives : 3;
+    if (lives !== this._lastLives) {
+      this._lastLives = lives;
+      this._renderLives(lives);
+    }
+  }
+
+  _renderLives(lives) {
+    const el = this.elements.lives;
+    if (!el) return;
+
+    let html = '';
+    for (let i = 0; i < 3; i++) {
+      if (i < lives) {
+        html += '<span class="hud-life hud-life-active">♥</span>';
+      } else {
+        html += '<span class="hud-life hud-life-lost">♥</span>';
+      }
+    }
+    el.innerHTML = html;
   }
 
   addKillFeedEntry(killerName, victimName, weapon = 'blaster') {
@@ -111,6 +137,7 @@ export class HUD {
 
   show() {
     this.container.classList.remove('hud-hidden');
+    this._lastLives = -1; // Force re-render on show
   }
 
   hide() {

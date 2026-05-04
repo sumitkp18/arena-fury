@@ -176,7 +176,16 @@ export default {
 
       // ─── READY TOGGLE ────────────────────────────────────────
       socket.on(CLIENT_EVENTS.READY_TOGGLE, () => {
-        // Placeholder for ready system
+        const roomId = socketToRoom.get(socket.id);
+        if (roomId) {
+          const room = gameLoop.getRoom(roomId);
+          if (room && (room.state === 'game_over' || room.state === 'lobby')) {
+            // Restart the game if enough players
+            if (room.players.size >= 2) {
+              room.startGame();
+            }
+          }
+        }
       });
 
       // ─── PLAYER INPUT ────────────────────────────────────────
