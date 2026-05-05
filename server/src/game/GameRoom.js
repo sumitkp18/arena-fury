@@ -40,6 +40,11 @@ export default class GameRoom {
       color: player.color
     });
 
+    // If joining mid-game, grant spawn invulnerability
+    if (this.state === 'playing') {
+      player.invulnerableUntil = Date.now() + GAME.INVULN_TIME;
+    }
+
     return player;
   }
 
@@ -203,6 +208,15 @@ export default class GameRoom {
 
       // Clear projectiles
       this.projectiles.clear();
+
+      // Transition back to lobby so players can ready up again
+      setTimeout(() => {
+        this.state = 'lobby';
+        for (const p of this.players.values()) {
+          p.ready = false;
+        }
+        console.log(`[Room:${this.id.slice(0,8)}] Room returned to lobby state`);
+      }, 1000);
     }
   }
 
@@ -335,6 +349,14 @@ export default class GameRoom {
     let count = 0;
     for (const player of this.players.values()) {
       if (player.state === 'alive') count++;
+    }
+    return count;
+  }
+
+  getReadyCount() {
+    let count = 0;
+    for (const player of this.players.values()) {
+      if (player.ready) count++;
     }
     return count;
   }

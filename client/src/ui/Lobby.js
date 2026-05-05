@@ -47,10 +47,13 @@ export class Lobby {
             <!-- Player cards injected here -->
           </div>
 
+          <div class="ready-count" id="ready-count">0/0 Ready</div>
+
           <div id="countdown-display" class="countdown-text" style="display: none;"></div>
 
           <div class="room-bottom-actions">
-            <button class="btn-neon btn-ready" id="btn-ready" disabled>WAITING FOR PLAYERS...</button>
+            <button class="btn-neon btn-ready" id="btn-ready">READY UP</button>
+            <button class="btn-neon btn-start-game" id="btn-startgame" disabled>⚡ START GAME</button>
             <button class="btn-neon secondary btn-leave" id="btn-leaveroom">✕ Leave</button>
           </div>
         </div>
@@ -122,10 +125,13 @@ export class Lobby {
     });
 
     document.getElementById('btn-ready').addEventListener('click', () => {
-      if (this.playerCount < 2) return; // Extra safety
       this.isReady = !this.isReady;
       this.updateReadyButton();
       this.onAction('toggleReady', { ready: this.isReady });
+    });
+
+    document.getElementById('btn-startgame').addEventListener('click', () => {
+      this.onAction('startGame');
     });
 
     document.getElementById('btn-leaveroom').addEventListener('click', () => {
@@ -167,44 +173,86 @@ export class Lobby {
     const players = state.players || {};
     this.playerCount = Object.keys(players).length;
 
+    let readyCount = 0;
     Object.values(players).forEach(p => {
+      if (p.ready) readyCount++;
       const card = document.createElement('div');
       card.className = 'player-card';
+      card.id = `player-card-${p.id}`;
+      const statusClass = p.ready ? 'player-status-ready' : 'player-status-waiting';
+      const statusText = p.ready ? '✓ READY' : 'NOT READY';
       card.innerHTML = `
         <div class="player-info">
           <div class="player-color" style="background-color: ${p.color || '#fff'}; box-shadow: 0 0 8px ${p.color || '#fff'}"></div>
           <div class="player-name">${this.escapeHTML(p.username || 'Unknown')}</div>
         </div>
-        <div class="player-status">JOINED</div>
+        <div class="player-status ${statusClass}">${statusText}</div>
       `;
       list.appendChild(card);
     });
 
-    // Update ready button state based on player count
+    this._updateReadyCount(readyCount, this.playerCount);
     this.updateReadyButton();
   }
 
   /**
-   * Update the ready button — disabled if fewer than 2 players.
+   * Update a single player's ready status without re-rendering the whole list.
+   */
+  updatePlayerReady(data) {
+    const { playerId, ready, readyCount, totalCount } = data;
+
+    // Update the player card badge
+    const card = document.getElementById(`player-card-${playerId}`);
+    if (card) {
+      const statusEl = card.querySelector('.player-status');
+      if (statusEl) {
+        statusEl.className = `player-status ${ready ? 'player-status-ready' : 'player-status-waiting'}`;
+        statusEl.textContent = ready ? '✓ READY' : 'NOT READY';
+      }
+    }
+
+    // Also update in cached room state
+    if (this.currentRoom?.players?.[playerId]) {
+      this.currentRoom.players[playerId].ready = ready;
+    }
+
+    this._updateReadyCount(readyCount, totalCount);
+    this.updateStartButton(readyCount);
+  }
+
+  _updateReadyCount(readyCount, totalCount) {
+    const el = document.getElementById('ready-count');
+    if (el) {
+      el.textContent = `${readyCount}/${totalCount} Ready`;
+      el.className = readyCount >= 2 ? 'ready-count ready-count-enough' : 'ready-count';
+    }
+  }
+
+  updateStartButton(readyCount) {
+    const btn = document.getElementById('btn-startgame');
+    if (!btn) return;
+    if (readyCount >= 2) {
+      btn.disabled = false;
+      btn.textContent = `⚡ START GAME (${readyCount} ready)`;
+    } else {
+      btn.disabled = true;
+      btn.textContent = '⚡ START GAME';
+    }
+  }
+
+  /**
+   * Update the ready button visual state.
    */
   updateReadyButton() {
     const btn = document.getElementById('btn-ready');
     if (!btn) return;
 
-    if (this.playerCount < 2) {
-      btn.disabled = true;
-      btn.textContent = 'WAITING FOR PLAYERS...';
-      btn.classList.remove('is-ready');
-      this.isReady = false;
+    if (this.isReady) {
+      btn.classList.add('is-ready');
+      btn.textContent = '✓ READY';
     } else {
-      btn.disabled = false;
-      if (this.isReady) {
-        btn.classList.add('is-ready');
-        btn.textContent = '✓ READY';
-      } else {
-        btn.classList.remove('is-ready');
-        btn.textContent = 'READY UP';
-      }
+      btn.classList.remove('is-ready');
+      btn.textContent = 'READY UP';
     }
   }
 

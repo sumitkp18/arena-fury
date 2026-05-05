@@ -25,6 +25,7 @@ export default class PlayerState {
     this.health = this.maxHealth;
     this.lives = GAME.LIVES;
     this.state = 'alive';
+    this.ready = false;
 
     this.kills = 0;
     this.deaths = 0;
@@ -139,6 +140,7 @@ export default class PlayerState {
     this.score = 0;
     this.health = this.maxHealth;
     this.state = 'alive';
+    this.ready = false;
     this.invulnerableUntil = 0;
     const spawn = getRandomSpawnPoint();
     this.x = spawn.x;
@@ -165,7 +167,8 @@ export default class PlayerState {
       username: this.username,
       score: this.score,
       kills: this.kills,
-      deaths: this.deaths
+      deaths: this.deaths,
+      ready: this.ready
     };
   }
 

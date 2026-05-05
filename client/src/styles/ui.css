@@ -186,24 +186,80 @@
 
 .player-status {
   font-family: var(--font-display);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   color: var(--color-text-dim);
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
 }
 
-.player-status.ready {
-  color: var(--color-primary);
-  text-shadow: 0 0 5px var(--color-primary);
+.player-status-ready {
+  color: #00ff88;
+  text-shadow: 0 0 6px rgba(0, 255, 136, 0.5);
+  background: rgba(0, 255, 136, 0.1);
+  border: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+.player-status-waiting {
+  color: var(--color-text-dim);
+  opacity: 0.5;
+}
+
+/* Ready Count */
+.ready-count {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--color-text-dim);
+  text-align: center;
+  letter-spacing: 2px;
+  margin-top: 0.75rem;
+  padding: 0.3rem 0;
+  transition: color 0.3s ease;
+}
+
+.ready-count-enough {
+  color: #00ff88;
+  text-shadow: 0 0 6px rgba(0, 255, 136, 0.4);
 }
 
 .btn-ready {
-  width: 100%;
-  font-size: 1.2rem;
-  padding: 1rem;
+  width: auto;
+  flex: 2;
+  font-size: 1.1rem;
+  padding: 0.9rem;
 }
 
 .btn-ready.is-ready {
   background: rgba(0, 255, 204, 0.2);
   animation: pulse-primary 2s infinite;
+}
+
+.btn-start-game {
+  flex: 2;
+  font-size: 1.1rem;
+  padding: 0.9rem;
+  background: rgba(255, 170, 0, 0.1);
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+}
+
+.btn-start-game:not(:disabled):hover {
+  background: rgba(255, 170, 0, 0.25);
+  box-shadow: 0 0 15px rgba(255, 170, 0, 0.3);
+}
+
+.btn-start-game:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  border-color: var(--color-text-dim);
+  color: var(--color-text-dim);
+  box-shadow: none;
+}
+
+.btn-start-game:disabled:hover {
+  background: transparent;
+  box-shadow: none;
 }
 
 /* Game Over / Results Screen */
@@ -247,18 +303,21 @@
 /* Room bottom actions */
 .room-bottom-actions {
   display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .room-bottom-actions .btn-ready {
-  flex: 3;
+  flex: 2;
+  min-width: 100px;
 }
 
 .room-bottom-actions .btn-leave {
   flex: 1;
-  font-size: 0.9rem;
-  padding: 0.8rem;
+  font-size: 0.85rem;
+  padding: 0.7rem;
+  min-width: 80px;
 }
 
 /* Disabled ready button (waiting for players) */
@@ -578,4 +637,89 @@
   .winner-title { font-size: 1.5rem; }
   .winner-subtitle { font-size: 0.8rem; margin-bottom: 0.5rem; }
   .winner-stats { margin-bottom: 0.5rem; }
+}
+
+/* ─── Exit Confirmation Dialog ────────────────────────── */
+.exit-confirm-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: rgba(0, 0, 0, 0);
+  backdrop-filter: blur(0px);
+  transition: background 0.3s ease, backdrop-filter 0.3s ease;
+  pointer-events: auto;
+}
+
+.exit-confirm-overlay.exit-confirm-visible {
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(6px);
+}
+
+.exit-confirm-box {
+  background: rgba(10, 10, 30, 0.85);
+  border: 1px solid rgba(0, 255, 204, 0.25);
+  border-radius: 12px;
+  padding: 2rem 2.5rem;
+  text-align: center;
+  max-width: 380px;
+  width: 90%;
+  transform: scale(0.85);
+  opacity: 0;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+  box-shadow:
+    0 0 40px rgba(0, 255, 204, 0.08),
+    inset 0 0 30px rgba(0, 255, 204, 0.03);
+}
+
+.exit-confirm-visible .exit-confirm-box {
+  transform: scale(1);
+  opacity: 1;
+}
+
+.exit-confirm-title {
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  color: var(--color-warning);
+  margin-bottom: 0.5rem;
+  text-shadow: 0 0 12px rgba(255, 170, 0, 0.4);
+}
+
+.exit-confirm-text {
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  color: var(--color-text-dim);
+  margin-bottom: 1.5rem;
+}
+
+.exit-confirm-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.exit-confirm-actions .btn-neon {
+  min-width: 120px;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 768px), (max-height: 500px) {
+  .exit-confirm-box {
+    padding: 1.5rem 1.5rem;
+  }
+
+  .exit-confirm-title {
+    font-size: 1.2rem;
+  }
+
+  .exit-confirm-actions .btn-neon {
+    min-width: 100px;
+    font-size: 0.8rem;
+    padding: 0.5rem 0.8rem;
+  }
 }

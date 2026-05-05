@@ -32,19 +32,22 @@ class App {
       this.handleLobbyAction.bind(this)
     );
 
-    // HUD exit button → leave game and return to lobby
+    // HUD exit button → show confirmation
     this.hud.onExit(() => {
-      this.exitGame();
+      this.showExitConfirmation();
     });
 
-    // ESC key also exits
+    // ESC key → release pointer lock, then show confirmation
     window.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && this.state === 'playing') {
-        // Release pointer lock first, second press exits
+        if (this._exitDialogVisible) {
+          this.hideExitConfirmation();
+          return;
+        }
         if (document.pointerLockElement) {
           document.exitPointerLock();
         } else {
-          this.exitGame();
+          this.showExitConfirmation();
         }
       }
     });
@@ -59,9 +62,22 @@ class App {
   }
 
   setupSocketListeners() {
-    // Room joined — we're in a lobby waiting for the game
+    // Room joined — lobby or mid-game join
     this.socketManager.on(SERVER_EVENTS.ROOM_JOINED, (data) => {
-      console.log('[App] Room joined:', data.roomId);
+      console.log('[App] Room joined:', data.roomId, 'state:', data.state);
+
+      // If the room is already playing, jump straight into the game
+      if (data.state === 'playing' || data.state === 'countdown') {
+        this.startGame({
+          roomId: data.roomId,
+          players: data.players || {},
+          projectiles: [],
+          state: data.state,
+          timestamp: Date.now()
+        });
+        return;
+      }
+
       if (this.lobby) {
         this.lobby.updateRoomState({
           id: data.roomId,
@@ -80,13 +96,18 @@ class App {
     // Player joined — update lobby player list
     this.socketManager.on(SERVER_EVENTS.PLAYER_JOINED, (data) => {
       console.log('[App] Player joined:', data.username);
-      // Request updated room state
       if (this.state === 'lobby' && this.lobby?.currentRoom) {
-        // Add the new player to the existing room state
         if (this.lobby.currentRoom.players) {
           this.lobby.currentRoom.players[data.id] = data;
           this.lobby.updateRoomState(this.lobby.currentRoom);
         }
+      }
+    });
+
+    // Player ready — update ready status badge
+    this.socketManager.on(SERVER_EVENTS.PLAYER_READY, (data) => {
+      if (this.lobby) {
+        this.lobby.updatePlayerReady(data);
       }
     });
 
@@ -159,8 +180,19 @@ class App {
         this.lobby.showGameOverBanner(results, {
           onPlayAgain: () => {
             this.lobby.hideWinnerBanner();
-            // Tell server we want to play again
-            this.socketManager.emit(CLIENT_EVENTS.READY_TOGGLE, { ready: true });
+            // Clean up game and return to lobby to ready up again
+            if (this.game) {
+              this.game.dispose();
+              this.game = null;
+            }
+            this.state = 'lobby';
+            this.hud.hide();
+            this.lobby.show();
+            // Re-fetch room state from server
+            if (this.lobby.currentRoom) {
+              this.lobby.isReady = false;
+              this.lobby.updateReadyButton();
+            }
           },
           onExit: () => {
             this.lobby.hideWinnerBanner();
@@ -193,6 +225,9 @@ class App {
       case 'toggleReady':
         this.socketManager.emit(CLIENT_EVENTS.READY_TOGGLE, { ready: data.ready });
         break;
+      case 'startGame':
+        this.socketManager.emit(CLIENT_EVENTS.START_GAME);
+        break;
       case 'leaveRoom':
         this.socketManager.emit(CLIENT_EVENTS.LEAVE_ROOM);
         break;
@@ -211,12 +246,73 @@ class App {
     this.game = new Game(canvasContainer, this.socketManager, this.hud);
     this.game.init(initialSnapshot);
     this.game.start();
+
+    // Show room code in HUD
+    if (initialSnapshot.roomId) {
+      this.hud.setRoomCode(initialSnapshot.roomId);
+    }
+  }
+
+  /**
+   * Show an exit confirmation dialog.
+   */
+  showExitConfirmation() {
+    if (this._exitDialogVisible) return;
+    this._exitDialogVisible = true;
+
+    // Release pointer lock so mouse is free
+    if (document.pointerLockElement) {
+      document.exitPointerLock();
+    }
+
+    this._exitDialog = document.createElement('div');
+    this._exitDialog.className = 'exit-confirm-overlay';
+    this._exitDialog.innerHTML = `
+      <div class="exit-confirm-box">
+        <h2 class="exit-confirm-title">Leave Game?</h2>
+        <p class="exit-confirm-text">You'll lose your progress in this match.</p>
+        <div class="exit-confirm-actions">
+          <button class="btn-neon secondary" id="exit-confirm-leave">Leave Game</button>
+          <button class="btn-neon" id="exit-confirm-stay">Keep Playing</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(this._exitDialog);
+
+    // Animate in
+    requestAnimationFrame(() => {
+      this._exitDialog.classList.add('exit-confirm-visible');
+    });
+
+    document.getElementById('exit-confirm-leave').addEventListener('click', () => {
+      this.hideExitConfirmation();
+      this.exitGame();
+    });
+
+    document.getElementById('exit-confirm-stay').addEventListener('click', () => {
+      this.hideExitConfirmation();
+    });
+  }
+
+  hideExitConfirmation() {
+    this._exitDialogVisible = false;
+    if (this._exitDialog) {
+      this._exitDialog.classList.remove('exit-confirm-visible');
+      setTimeout(() => {
+        if (this._exitDialog && this._exitDialog.parentNode) {
+          this._exitDialog.parentNode.removeChild(this._exitDialog);
+        }
+        this._exitDialog = null;
+      }, 300);
+    }
   }
 
   /**
    * Exit the game — clean up, leave room, return to lobby.
    */
   exitGame() {
+    this.hideExitConfirmation();
+
     // Release pointer lock
     if (document.pointerLockElement) {
       document.exitPointerLock();

@@ -3,6 +3,7 @@ export class HUD {
     this.container = container;
     this.elements = {};
     this._lastLives = -1;
+    this._roomCode = '';
     this.createDOM();
   }
 
@@ -11,6 +12,7 @@ export class HUD {
       <div class="hud-stats">
         <div>Ping: <span class="stat-value" id="hud-ping">0ms</span></div>
         <div>Alive: <span class="stat-value" id="hud-players">0/0</span></div>
+        <div class="hud-room-code" id="hud-room-code" title="Tap to share room code"></div>
       </div>
       
       <div class="hud-score" id="hud-score">
@@ -40,11 +42,63 @@ export class HUD {
       players: document.getElementById('hud-players'),
       score: document.getElementById('hud-score'),
       lives: document.getElementById('hud-lives'),
+      roomCode: document.getElementById('hud-room-code'),
       killfeed: document.getElementById('hud-killfeed'),
       healthFill: document.getElementById('hud-health-fill'),
       dashFill: document.getElementById('hud-dash-fill'),
       exitBtn: document.getElementById('hud-exit-btn')
     };
+
+    // Click room code to copy/share
+    if (this.elements.roomCode) {
+      this.elements.roomCode.addEventListener('click', () => this._shareRoomCode());
+    }
+  }
+
+  /**
+   * Set the room code to display in the HUD.
+   */
+  setRoomCode(roomId) {
+    this._roomCode = roomId ? roomId.slice(0, 8).toUpperCase() : '';
+    if (this.elements.roomCode) {
+      this.elements.roomCode.innerHTML = `Room: <span class="stat-value">${this._roomCode}</span> <span class="hud-share-icon">📋</span>`;
+    }
+  }
+
+  _shareRoomCode() {
+    if (!this._roomCode) return;
+
+    // Try native share (mobile), fallback to clipboard
+    if (navigator.share) {
+      navigator.share({
+        title: 'Arena Fury',
+        text: `Join my Arena Fury match! Room code: ${this._roomCode}`,
+      }).catch(() => {
+        // Cancelled or failed — fallback to clipboard
+        this._copyToClipboard();
+      });
+    } else {
+      this._copyToClipboard();
+    }
+  }
+
+  _copyToClipboard() {
+    navigator.clipboard.writeText(this._roomCode).then(() => {
+      this._showCopiedFeedback();
+    }).catch(() => {
+      // Fallback for older browsers
+      this._showCopiedFeedback();
+    });
+  }
+
+  _showCopiedFeedback() {
+    const el = this.elements.roomCode;
+    if (!el) return;
+    const orig = el.innerHTML;
+    el.innerHTML = `<span class="stat-value">Copied! ✓</span>`;
+    setTimeout(() => {
+      el.innerHTML = `Room: <span class="stat-value">${this._roomCode}</span> <span class="hud-share-icon">📋</span>`;
+    }, 1500);
   }
 
   /**
@@ -137,7 +191,7 @@ export class HUD {
 
   show() {
     this.container.classList.remove('hud-hidden');
-    this._lastLives = -1; // Force re-render on show
+    this._lastLives = -1;
   }
 
   hide() {

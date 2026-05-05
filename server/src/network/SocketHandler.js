@@ -55,15 +55,6 @@ export default {
             [...targetRoom.players.entries()].map(([sid, p]) => [p.id, p.toSnapshot()])
           )
         });
-
-        // Auto-start when 2+ players are in the room
-        if (targetRoom.players.size >= 2 && targetRoom.state === 'lobby') {
-          setTimeout(() => {
-            if (targetRoom.players.size >= 2 && targetRoom.state === 'lobby') {
-              targetRoom.startGame();
-            }
-          }, 2000); // Give a moment for UI to settle
-        }
       });
 
       // ─── CREATE ROOM ─────────────────────────────────────────
@@ -135,11 +126,6 @@ export default {
           return;
         }
 
-        if (targetRoom.state !== 'lobby') {
-          socket.emit(SERVER_EVENTS.ERROR, { message: 'Game already in progress' });
-          return;
-        }
-
         const name = username || 'Player_' + Math.random().toString(36).substring(2, 6);
         const color = COLORS[colorIndex % COLORS.length];
         colorIndex++;
@@ -158,15 +144,6 @@ export default {
             [...targetRoom.players.entries()].map(([sid, p]) => [p.id, p.toSnapshot()])
           )
         });
-
-        // Auto-start
-        if (targetRoom.players.size >= 2 && targetRoom.state === 'lobby') {
-          setTimeout(() => {
-            if (targetRoom.players.size >= 2 && targetRoom.state === 'lobby') {
-              targetRoom.startGame();
-            }
-          }, 2000);
-        }
       });
 
       // ─── LEAVE ROOM ──────────────────────────────────────────
@@ -177,15 +154,47 @@ export default {
       // ─── READY TOGGLE ────────────────────────────────────────
       socket.on(CLIENT_EVENTS.READY_TOGGLE, () => {
         const roomId = socketToRoom.get(socket.id);
-        if (roomId) {
-          const room = gameLoop.getRoom(roomId);
-          if (room && (room.state === 'game_over' || room.state === 'lobby')) {
-            // Restart the game if enough players
-            if (room.players.size >= 2) {
-              room.startGame();
-            }
-          }
+        if (!roomId) return;
+        const room = gameLoop.getRoom(roomId);
+        if (!room) return;
+
+        const player = room.players.get(socket.id);
+        if (!player) return;
+
+        // Only allow ready toggle in lobby or game_over states
+        if (room.state !== 'lobby' && room.state !== 'game_over') return;
+
+        player.ready = !player.ready;
+        console.log(`[Room:${room.id.slice(0,8)}] "${player.username}" is ${player.ready ? 'READY' : 'NOT READY'}`);
+
+        room.broadcast(SERVER_EVENTS.PLAYER_READY, {
+          playerId: player.id,
+          ready: player.ready,
+          readyCount: room.getReadyCount(),
+          totalCount: room.players.size
+        });
+      });
+
+      // ─── START GAME ─────────────────────────────────────────
+      socket.on(CLIENT_EVENTS.START_GAME, () => {
+        const roomId = socketToRoom.get(socket.id);
+        if (!roomId) return;
+        const room = gameLoop.getRoom(roomId);
+        if (!room) return;
+
+        if (room.state !== 'lobby' && room.state !== 'game_over') {
+          socket.emit(SERVER_EVENTS.ERROR, { message: 'Cannot start game in current state' });
+          return;
         }
+
+        const readyCount = room.getReadyCount();
+        if (readyCount < 2) {
+          socket.emit(SERVER_EVENTS.ERROR, { message: `Need at least 2 ready players (${readyCount} ready)` });
+          return;
+        }
+
+        console.log(`[Room:${room.id.slice(0,8)}] Starting game with ${readyCount} ready players`);
+        room.startGame();
       });
 
       // ─── PLAYER INPUT ────────────────────────────────────────

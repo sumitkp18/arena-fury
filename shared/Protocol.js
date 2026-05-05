@@ -16,6 +16,7 @@ export const CLIENT_EVENTS = {
   READY_TOGGLE:    'lobby:ready',
   CHAT_MESSAGE:    'lobby:chat',
   QUICK_MATCH:     'lobby:quickmatch',
+  START_GAME:      'lobby:start_game',
 
   // Gameplay
   PLAYER_INPUT:    'game:input',
